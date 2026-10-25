@@ -12,9 +12,12 @@ export function CaseList({ cases }: { cases: CaseRecord[] }) {
         <span className="col-span-6 col-start-4">02 / Case & Summary</span>
         <span className="col-span-3 col-start-10">03 / Code & Date</span>
       </div>
-      <ol aria-label="Case results" className="divide-y divide-rule-soft border-b-2 border-ink bg-ground">
+      <ol aria-label="Case results" className="divide-y divide-rule-soft border-b-2 border-ink">
         {cases.map((record, position) => (
-          <li key={record.id} className="bg-ground transition-colors hover:bg-surface">
+          <li
+            key={record.id}
+            className={`${position % 2 === 1 ? 'bg-[#fafafa]' : 'bg-ground'} transition-colors hover:bg-surface`}
+          >
             <CaseResult record={record} index={position + 1} />
           </li>
         ))}

@@ -76,7 +76,10 @@ export function CaseSearch({ applied, courts, codes, onSubmit, onClear }: Props)
           <div className="flex flex-col justify-end gap-2.5 md:col-span-9 xl:col-span-3 xl:col-start-7 xl:row-start-1">
             <span className="label-caps mb-2 hidden text-ink-subtle xl:block xl:invisible">Actions</span>
             <div className="flex gap-2.5">
-              <button type="submit" className={`${primaryButtonClass} flex-1`}>
+              <button
+                type="submit"
+                className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-none border-2 border-accent bg-accent px-6 text-[13px] font-extrabold uppercase tracking-wider text-ground hover:bg-[#a60000] hover:border-[#a60000] active:bg-[#850000] active:border-[#850000] transition-colors"
+              >
                 Search
               </button>
               <button

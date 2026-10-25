@@ -67,12 +67,12 @@ export function CaseResult({ record, index }: { record: CaseRecord; index: numbe
         </h2>
 
         {reference && (
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] font-bold tracking-tight text-ink">
-            <span className="break-words font-mono text-[13px] font-semibold text-ink">{reference}</span>
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-ink">
+            <span className="break-words font-mono text-[13px] font-semibold tracking-[-0.01em] text-ink">{reference}</span>
           </p>
         )}
 
-        <p className="mt-2.5 line-clamp-2 max-w-[68ch] text-[15px] font-normal leading-[1.6] text-ink-muted">
+        <p className="mt-2 line-clamp-2 max-w-[68ch] text-[15px] font-normal leading-[1.6] text-ink-muted">
           {record.summary}
         </p>
 
@@ -85,13 +85,13 @@ export function CaseResult({ record, index }: { record: CaseRecord; index: numbe
               <li
                 key={tag}
                 title={tag}
-                className="max-w-full truncate border border-ink/20 bg-surface px-2.5 py-0.5 text-[12px] font-medium text-ink"
+                className="max-w-full truncate border border-ink/20 bg-ground px-2.5 py-0.5 text-[12px] font-medium tracking-wide text-ink"
               >
                 {tag}
               </li>
             ))}
             {hiddenTags > 0 && (
-              <li className="shrink-0 px-1 text-[11px] font-extrabold uppercase tracking-wide text-ink-subtle">
+              <li className="shrink-0 px-1 text-[11px] font-black uppercase tracking-wider text-ink-subtle">
                 +{hiddenTags} more
               </li>
             )}
@@ -111,7 +111,7 @@ export function CaseResult({ record, index }: { record: CaseRecord; index: numbe
           <div className="min-w-0">
             <dt className={metaLabel}>Decided</dt>
             <dd
-              className={`text-[13px] font-medium leading-[1.35] tabular-nums text-ink-subtle ${date ? '' : 'italic'}`}
+              className={`text-[13px] font-semibold leading-[1.35] tabular-nums text-ink-subtle ${date ? '' : 'italic'}`}
             >
               {date ?? 'Date not recorded'}
             </dd>
@@ -122,14 +122,14 @@ export function CaseResult({ record, index }: { record: CaseRecord; index: numbe
           <Link
             href={`/cases/${record.id}`}
             aria-label={`View case: ${record.title}`}
-            className={`${actionBase} bg-ink text-ground hover:bg-accent hover:border-accent hover:text-ground`}
+            className={`${actionBase} flex-1 justify-center bg-ink text-ground hover:bg-accent hover:border-accent hover:text-ground xl:flex-none`}
           >
             View
             <ArrowRight className="size-3.5" strokeWidth={3} aria-hidden="true" />
           </Link>
           <button
             type="button"
-            className={`${actionBase} bg-ground text-ink hover:bg-ink hover:text-ground`}
+            className={`${actionBase} flex-1 justify-center bg-ground text-ink hover:bg-ink hover:text-ground xl:flex-none`}
             aria-label={`Edit ${record.title}`}
             onClick={() => openDialog({ kind: 'form', caseId: record.id })}
           >

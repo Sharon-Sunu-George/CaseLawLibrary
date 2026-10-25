@@ -18,6 +18,9 @@ export function PageIntroduction() {
             Case Law Library
           </h1>
 
+          {/* Restrained red editorial accent rule */}
+          <div className="mt-3.5 h-1 w-12 bg-accent" aria-hidden="true" />
+
           <div className="mt-4 grid gap-y-3 border-t-2 border-ink pt-4 md:grid-cols-9 md:gap-x-[var(--dp-spacing-gutter)]">
             <p className="max-w-[42ch] text-[16px] font-medium leading-[1.4] text-ink-muted md:col-span-9 xl:col-span-6">
               Search, review, and explore indexed legal judgments, citations, and statutory codes.
