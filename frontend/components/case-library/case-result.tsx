@@ -1,140 +1,157 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Pencil } from 'lucide-react'
-import { formatDate } from '@/lib/case-query'
+import React, { useState } from 'react'
 import type { CaseRecord } from '@/lib/case-types'
 import { useLibrary } from './library-provider'
 
-const VISIBLE_TAGS = 2
+type Props = {
+  record: CaseRecord
+  index: number
+  onTagClick?: (tag: string) => void
+}
 
-const actionBase =
-  'inline-flex h-10 items-center gap-2 border-2 border-ink px-4 text-[12px] font-extrabold uppercase tracking-wider transition-colors'
+export function CaseResult({ record, index, onTagClick }: Props) {
+  const { openDialog, isAuthenticated, notify } = useLibrary()
+  const [expanded, setExpanded] = useState(false)
 
-// Dates and codes show their label below xl; at xl the table header supplies it.
-const metaLabel = 'label-caps text-ink-subtle xl:sr-only'
+  const formattedNumber = String(index).padStart(2, '0')
+  const visibleTags = expanded ? record.tags : record.tags.slice(0, 3)
+  const hiddenCount = Math.max(0, record.tags.length - 3)
 
-export function CaseResult({ record, index }: { record: CaseRecord; index: number }) {
-  const { openDialog } = useLibrary()
-  const date = formatDate(record.decisionDate)
-  const reference = [record.citation, record.caseNumber].filter(Boolean).join(' · ')
-  const hiddenTags = Math.max(0, record.tags.length - VISIBLE_TAGS)
+  const handleEdit = () => {
+    if (!isAuthenticated) {
+      notify('Please log in to edit case records.', 'info')
+      return
+    }
+    openDialog({ kind: 'form', caseId: record.id })
+  }
 
   return (
-    <article
-      aria-labelledby={`${record.id}-title`}
-      className="flex flex-col gap-4 py-6 md:grid md:grid-cols-12 md:gap-x-[var(--dp-spacing-gutter)] md:gap-y-4 xl:gap-y-0"
-    >
-      {/* Column 1: Court & Jurisdiction (columns 1-3) */}
-      <div className="min-w-0 md:col-span-3 md:col-start-1 md:row-span-2 md:row-start-1">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="flex size-7 items-center justify-center bg-ink text-[12px] font-black tabular-nums text-ground"
-          >
-            {String(index).padStart(2, '0')}
+    <article className="grid grid-cols-1 md:grid-cols-[23.5%_53.5%_23%] border-b border-neutral-300 last:border-b-[1.5px] last:border-black py-5 md:py-6 bg-white hover:bg-neutral-50/70 transition-colors">
+      {/* COLUMN 01: COURT & JURISDICTION */}
+      <div className="px-5 lg:px-7 pb-4 md:pb-0 flex flex-col justify-start">
+        <div className="flex items-center gap-3 flex-wrap mb-1.5">
+          <span className="text-[13px] font-extrabold text-[#D91C1F] tracking-tight">
+            {formattedNumber}
           </span>
           {record.needsReview && (
-            <span
-              title="Needs review"
-              className="inline-flex items-center gap-1.5 border border-accent bg-accent-subtle px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-accent"
-            >
-              <span className="size-1.5 bg-accent" aria-hidden="true" />
-              Review
+            <span className="inline-flex items-center gap-1.5 border border-[#D91C1F] px-2 py-0.5 text-[9.5px] font-extrabold tracking-[0.11em] uppercase text-[#D91C1F] bg-white">
+              <span className="w-1.5 h-1.5 bg-[#D91C1F] inline-block" aria-hidden="true" />
+              REVIEW
             </span>
           )}
         </div>
-        <dl className="mt-2.5 text-[14px] leading-[1.4]">
-          <dt className="sr-only">Court</dt>
-          <dd className="break-words text-[15px] font-extrabold text-ink">{record.court}</dd>
-          <dt className="sr-only">Jurisdiction</dt>
-          <dd className="mt-0.5 break-words text-[13px] font-medium text-ink-subtle">{record.jurisdiction}</dd>
-        </dl>
+        <div className="text-[13.5px] font-extrabold text-black leading-snug">
+          {record.court}
+        </div>
+        <div className="text-[12px] text-neutral-500 mt-0.5">
+          {record.jurisdiction}
+        </div>
       </div>
 
-      {/* Column 2: Case title, reference, summary & tags (columns 4-9) */}
-      <div className="min-w-0 md:col-span-9 md:col-start-4 md:row-start-1 xl:col-span-6">
-        <h2
-          id={`${record.id}-title`}
-          className="text-[20px] font-[800] leading-[1.25] tracking-[-0.02em] text-ink"
-        >
-          <Link
-            href={`/cases/${record.id}`}
-            className="hover:text-accent decoration-2 underline-offset-4 hover:underline transition-colors"
-          >
-            {record.title}
-          </Link>
-        </h2>
-
-        {reference && (
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-ink">
-            <span className="break-words font-mono text-[13px] font-semibold tracking-[-0.01em] text-ink">{reference}</span>
-          </p>
-        )}
-
-        <p className="mt-2 line-clamp-2 max-w-[68ch] text-[15px] font-normal leading-[1.6] text-ink-muted">
-          {record.summary}
-        </p>
-
-        {record.tags.length > 0 && (
-          <ul
-            aria-label="Legal topics"
-            className="mt-3 flex flex-wrap items-center gap-1.5"
-          >
-            {record.tags.slice(0, VISIBLE_TAGS).map((tag) => (
-              <li
-                key={tag}
-                title={tag}
-                className="max-w-full truncate border border-ink/20 bg-ground px-2.5 py-0.5 text-[12px] font-medium tracking-wide text-ink"
-              >
-                {tag}
-              </li>
-            ))}
-            {hiddenTags > 0 && (
-              <li className="shrink-0 px-1 text-[11px] font-black uppercase tracking-wider text-ink-subtle">
-                +{hiddenTags} more
-              </li>
-            )}
-          </ul>
-        )}
-      </div>
-
-      {/* Column 3: Code / Decided & Actions (columns 10-12) */}
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3 md:col-span-9 md:col-start-4 md:row-start-2 xl:col-span-3 xl:col-start-10 xl:row-start-1 xl:flex-col xl:items-start xl:justify-between xl:gap-y-4 xl:pt-0.5">
-        <dl className="flex flex-wrap gap-x-8 gap-y-2 xl:flex-col xl:gap-y-1.5">
-          <div className="min-w-0">
-            <dt className={metaLabel}>Code</dt>
-            <dd className="break-words text-[14px] font-extrabold leading-[1.3] text-ink">
-              {record.code}
-            </dd>
-          </div>
-          <div className="min-w-0">
-            <dt className={metaLabel}>Decided</dt>
-            <dd
-              className={`text-[13px] font-semibold leading-[1.35] tabular-nums text-ink-subtle ${date ? '' : 'italic'}`}
+      {/* COLUMN 02: CASE RECORD */}
+      <div className="px-5 lg:px-7 py-4 md:py-0 border-t md:border-t-0 md:border-l border-neutral-300 flex flex-col justify-between">
+        <div>
+          <h3 className="text-[17px] lg:text-[18.5px] font-extrabold text-black tracking-[-0.02em] leading-[1.25]">
+            <Link
+              href={`/cases/${record.id}`}
+              className="text-left hover:text-[#D91C1F] transition-colors cursor-pointer focus:outline-none"
             >
-              {date ?? 'Date not recorded'}
-            </dd>
+              {record.title}
+            </Link>
+          </h3>
+          <div className="text-[12.5px] text-neutral-500 mt-1 mb-2.5 font-normal">
+            {record.citation || record.caseNumber}
           </div>
-        </dl>
+          <p className="text-[13.5px] text-neutral-700 leading-[1.55] mb-3.5">
+            {record.summary}
+          </p>
+        </div>
 
-        <div className="flex w-full items-center gap-2 xl:w-auto">
+        {/* Topics / Legal Tags */}
+        {record.tags && record.tags.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-neutral-700 pt-0.5">
+            {visibleTags.map((topic, topicIdx) => (
+              <React.Fragment key={`${record.id}-topic-${topicIdx}`}>
+                {onTagClick ? (
+                  <button
+                    type="button"
+                    onClick={() => onTagClick(topic)}
+                    className="hover:text-[#D91C1F] hover:underline transition-colors cursor-pointer text-left"
+                  >
+                    {topic}
+                  </button>
+                ) : (
+                  <span className="hover:text-[#D91C1F] transition-colors">{topic}</span>
+                )}
+                {topicIdx < visibleTags.length - 1 && (
+                  <span className="text-[#D91C1F] font-semibold select-none" aria-hidden="true">
+                    /
+                  </span>
+                )}
+              </React.Fragment>
+            ))}
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setExpanded((p) => !p)}
+                className="font-extrabold text-black hover:text-[#D91C1F] ml-1 cursor-pointer transition-colors"
+              >
+                {expanded ? 'Show less' : `+ ${hiddenCount} more`}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* COLUMN 03: METADATA & ACTIONS */}
+      <div className="px-5 lg:px-7 pt-4 md:pt-0 border-t md:border-t-0 md:border-l border-neutral-300 flex flex-col justify-between">
+        <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
+          <div>
+            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-neutral-400">
+              CODE
+            </div>
+            <div className="text-[12.5px] font-extrabold text-black leading-snug mt-0.5">
+              {record.code}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-neutral-400">
+              DECIDED
+            </div>
+            <div className="text-[12.5px] text-neutral-700 mt-0.5">
+              {record.decidedDisplay || record.decisionDate || 'Not recorded'}
+            </div>
+          </div>
+        </div>
+
+        {/* Row Actions: VIEW ↗ | ✎ EDIT */}
+        <div className="flex items-center gap-4 pt-4 mt-3">
           <Link
             href={`/cases/${record.id}`}
-            aria-label={`View case: ${record.title}`}
-            className={`${actionBase} flex-1 justify-center bg-ink text-ground hover:bg-accent hover:border-accent hover:text-ground xl:flex-none`}
+            className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-[#D91C1F] hover:underline inline-flex items-center gap-1.5 cursor-pointer"
           >
-            View
-            <ArrowRight className="size-3.5" strokeWidth={3} aria-hidden="true" />
+            <span>VIEW</span>
+            <span aria-hidden="true" className="text-[12px] leading-none">
+              ↗
+            </span>
           </Link>
+          <span className="w-[1.5px] h-4 bg-black" aria-hidden="true" />
           <button
             type="button"
-            className={`${actionBase} flex-1 justify-center bg-ground text-ink hover:bg-ink hover:text-ground xl:flex-none`}
-            aria-label={`Edit ${record.title}`}
-            onClick={() => openDialog({ kind: 'form', caseId: record.id })}
+            onClick={handleEdit}
+            className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-black hover:text-[#D91C1F] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Pencil className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
-            Edit
+            <svg
+              className="w-3 h-3"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
+            </svg>
+            <span>EDIT</span>
           </button>
         </div>
       </div>

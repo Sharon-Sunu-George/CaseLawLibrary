@@ -6,7 +6,7 @@ export default function Page() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-[1440px] px-4 py-16 xs:px-5 md:px-7 xl:px-10">
+        <div className="frame py-16">
           <LoadingState />
         </div>
       }

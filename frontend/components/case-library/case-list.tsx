@@ -1,27 +1,48 @@
+'use client'
+
 import type { CaseRecord } from '@/lib/case-types'
 import { CaseResult } from './case-result'
 
-export function CaseList({ cases }: { cases: CaseRecord[] }) {
+type Props = {
+  cases: CaseRecord[]
+  currentPage: number
+  pageSize: number
+  onTagClick?: (tag: string) => void
+}
+
+export function CaseList({ cases, currentPage, pageSize, onTagClick }: Props) {
   return (
     <div>
+      {/* THREE-COLUMN CASE RECORDS TABLE HEADER */}
       <div
+        role="row"
         aria-hidden="true"
-        className="label-caps hidden border-b-2 border-ink py-3.5 text-ink xl:grid xl:grid-cols-12 xl:gap-x-[var(--dp-spacing-gutter)]"
+        className="hidden md:grid md:grid-cols-[23.5%_53.5%_23%] border-b-[1.5px] border-black bg-white py-3 items-center"
       >
-        <span className="col-span-3 col-start-1">01 / Court & Jurisdiction</span>
-        <span className="col-span-6 col-start-4">02 / Case & Summary</span>
-        <span className="col-span-3 col-start-10">03 / Code & Date</span>
+        <div className="px-5 lg:px-7 text-[10.5px] font-extrabold tracking-[0.11em] uppercase text-black">
+          01 / COURT &amp; JURISDICTION
+        </div>
+        <div className="px-5 lg:px-7 border-l-[1.5px] border-black text-[10.5px] font-extrabold tracking-[0.11em] uppercase text-black leading-none py-0.5">
+          02 / CASE RECORD
+        </div>
+        <div className="px-5 lg:px-7 border-l-[1.5px] border-black text-[10.5px] font-extrabold tracking-[0.11em] uppercase text-black leading-none py-0.5">
+          03 / METADATA &amp; ACTIONS
+        </div>
       </div>
-      <ol aria-label="Case results" className="divide-y divide-rule-soft border-b-2 border-ink">
-        {cases.map((record, position) => (
-          <li
-            key={record.id}
-            className={`${position % 2 === 1 ? 'bg-[#fafafa]' : 'bg-ground'} transition-colors hover:bg-surface`}
-          >
-            <CaseResult record={record} index={position + 1} />
-          </li>
-        ))}
-      </ol>
+
+      <section aria-label="Case Records">
+        {cases.map((record, idx) => {
+          const globalIndex = (currentPage - 1) * pageSize + idx + 1
+          return (
+            <CaseResult
+              key={record.id}
+              record={record}
+              index={globalIndex}
+              onTagClick={onTagClick}
+            />
+          )
+        })}
+      </section>
     </div>
   )
 }

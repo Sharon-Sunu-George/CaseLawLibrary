@@ -1,39 +1,52 @@
 export function PageIntroduction() {
   return (
-    <section aria-labelledby="page-title" className="border-b-2 border-ink">
-      <div className="frame grid swiss-cols gap-y-4 pb-6 pt-6 md:pb-7 md:pt-7">
-        <div className="md:col-span-3 md:pt-2">
-          <p className="label-caps flex items-center gap-2 text-ink">
-            <span className="size-2 bg-accent" aria-hidden="true" />
-            <span className="font-black text-ink">01</span>
-            <span className="text-ink-subtle">Library Overview</span>
+    <section
+      aria-labelledby="hero-heading"
+      className="grid grid-cols-1 md:grid-cols-[118px_1fr] lg:grid-cols-[132px_1fr] border-b-[1.5px] border-black"
+    >
+      {/* Left Section Rail 01 */}
+      <div className="md:border-r-[1.5px] border-b md:border-b-0 border-black px-4 sm:px-5 py-3 md:py-7 bg-white">
+        <div className="text-[11px] font-extrabold tracking-[0.1em] uppercase text-[#D91C1F] leading-[1.35]">
+          <div>01 /</div>
+          <div>LIBRARY</div>
+        </div>
+      </div>
+
+      {/* Asymmetric Two-Column Hero Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.58fr_1fr] bg-white">
+        {/* Left Hero Column */}
+        <div className="px-5 sm:px-8 py-6 sm:py-8">
+          <div className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-[#D91C1F] mb-2">
+            01 / LIBRARY
+          </div>
+          <h1
+            id="hero-heading"
+            className="text-[52px] sm:text-[68px] lg:text-[78px] font-black tracking-[-0.045em] leading-[0.92] text-black"
+          >
+            Case Law
+            <br />
+            Library
+          </h1>
+          <div className="w-14 h-[4px] bg-[#D91C1F] mt-5 mb-4" aria-hidden="true" />
+          <p className="text-[17px] sm:text-[19px] text-neutral-800 leading-[1.4] max-w-[430px] font-normal">
+            Search judgments, citations, and legal codes in one research index.
           </p>
         </div>
 
-        <div className="min-w-0 md:col-span-9">
-          <h1
-            id="page-title"
-            className="text-[clamp(2.5rem,6vw,5.5rem)] font-[850] leading-[0.92] tracking-[-0.04em] text-ink"
-          >
-            Case Law Library
-          </h1>
-
-          {/* Restrained red editorial accent rule */}
-          <div className="mt-3.5 h-1 w-12 bg-accent" aria-hidden="true" />
-
-          <div className="mt-4 grid gap-y-3 border-t-2 border-ink pt-4 md:grid-cols-9 md:gap-x-[var(--dp-spacing-gutter)]">
-            <p className="max-w-[42ch] text-[16px] font-medium leading-[1.4] text-ink-muted md:col-span-9 xl:col-span-6">
-              Search, review, and explore indexed legal judgments, citations, and statutory codes.
-            </p>
-            <div className="border border-accent bg-accent-subtle p-3 md:col-span-9 xl:col-span-3">
-              <span className="label-caps mb-1 flex items-center gap-1.5 font-black text-accent">
-                <span className="size-1.5 bg-accent" aria-hidden="true" />
-                Sample data notice
-              </span>
-              <p className="text-[12px] font-medium leading-[1.4] text-ink-muted">
-                Sample records for design review. None are verified judgments or formal legal advice.
+        {/* Right Hero Column */}
+        <div className="px-5 sm:px-8 py-6 sm:py-8 border-t lg:border-t-0 border-neutral-200 flex items-stretch">
+          <div className="w-full lg:border-l-[1.5px] lg:border-black lg:pl-8 flex flex-col justify-between py-1">
+            <div>
+              <h2 className="text-[12px] font-extrabold tracking-[0.11em] uppercase text-black leading-[1.45] mb-4">
+                A COMPREHENSIVE
+                <br />
+                RESEARCH RESOURCE
+              </h2>
+              <p className="text-[13.5px] text-neutral-700 leading-[1.6] max-w-[330px]">
+                Access judgments from courts across India, with advanced search and filtering to find relevant precedent quickly and accurately.
               </p>
             </div>
+            <div className="w-16 h-[3.5px] bg-[#D91C1F] mt-6" aria-hidden="true" />
           </div>
         </div>
       </div>

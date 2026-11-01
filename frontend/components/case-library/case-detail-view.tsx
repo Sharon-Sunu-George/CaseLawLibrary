@@ -1,203 +1,237 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, Copy, Pencil } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { formatDate } from '@/lib/case-query'
 import { useLibrary } from './library-provider'
-import { primaryButtonClass, secondaryButtonClass } from './ui'
-
-function Section({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <section
-      aria-label={label}
-      className="frame grid swiss-cols gap-y-4 border-t-2 border-ink py-8 md:py-10"
-    >
-      <h2 className="label-caps text-ink md:col-span-3">{label}</h2>
-      <div className="min-w-0 md:col-span-9">{children}</div>
-    </section>
-  )
-}
 
 export function CaseDetailView({ id }: { id: string }) {
-  const { cases, lastQuery, openDialog, notify } = useLibrary()
+  const { cases, lastQuery, openDialog, saveCase, notify, isAuthenticated } = useLibrary()
   const record = cases.find((item) => item.id === id)
   const backHref = lastQuery ? `/?${lastQuery}` : '/'
 
   const backBar = (
-    <div className="border-b-2 border-ink">
-      <div className="frame py-2">
-        <Link
-          href={backHref}
-          className="inline-flex h-11 items-center gap-2 pr-2 text-[14px] font-bold text-ink underline-offset-4 hover:underline"
-        >
-          <ArrowLeft className="size-4" strokeWidth={2.5} aria-hidden="true" />
-          Back to results
-        </Link>
-      </div>
+    <div className="border-b-[1.5px] border-black bg-white px-5 sm:px-8 py-3">
+      <Link
+        href={backHref}
+        className="inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.12em] text-black hover:text-[#D91C1F] transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>BACK TO RESEARCH INDEX</span>
+      </Link>
     </div>
   )
 
   if (!record) {
     return (
-      <>
+      <div className="min-h-[60vh] flex flex-col">
         {backBar}
-        <div className="frame grid swiss-cols py-12 md:py-16">
-          <div className="md:col-span-9 md:col-start-4">
-            <h1 className="text-[clamp(2.25rem,5vw,4rem)] font-[750] leading-[1] tracking-[-0.035em] text-ink">
-              Case not found
-            </h1>
-            <p className="mt-4 max-w-[56ch] text-[16px] leading-[1.5] text-ink-muted">
-              This record isn&apos;t in the library. Cases added during a session
-              are not stored anywhere, so they are lost when the page is reloaded.
-            </p>
-            <Link href="/" className={`${secondaryButtonClass} mt-6`}>
-              Return to the library
-            </Link>
+        <div className="px-6 py-16 text-center border-b-[1.5px] border-black bg-white flex-1 flex flex-col items-center justify-center">
+          <div className="text-[11px] font-extrabold tracking-[0.14em] uppercase text-[#D91C1F] mb-2">
+            00 / DOSSIER NOT FOUND
           </div>
+          <h1 className="text-2xl font-black text-black mb-2">Case Dossier Not Found</h1>
+          <p className="text-xs text-neutral-600 mb-6 max-w-md">
+            This record does not exist in the active session index. Unsaved additions expire on session reload.
+          </p>
+          <Link
+            href="/"
+            className="bg-black hover:bg-[#D91C1F] text-white text-[11px] font-extrabold tracking-[0.14em] uppercase px-6 h-10 inline-flex items-center transition-colors"
+          >
+            RETURN TO LIBRARY
+          </Link>
         </div>
-      </>
+      </div>
     )
   }
 
-  const reference = [record.citation, record.caseNumber].filter(Boolean).join(' · ')
-
-  const copyReference = async () => {
-    const text = [record.title, reference, record.court].filter(Boolean).join(', ')
-    try {
-      await navigator.clipboard.writeText(text)
-      notify('Reference copied to the clipboard.')
-    } catch {
-      notify('The reference could not be copied. Select the text and copy it manually.', 'info')
+  const handleToggleReview = () => {
+    const updated = {
+      ...record,
+      needsReview: !record.needsReview,
     }
+    saveCase(updated, false)
+    notify(
+      updated.needsReview
+        ? `Flagged "${record.title}" for review.`
+        : `Marked "${record.title}" as verified.`,
+    )
   }
 
-  const date = formatDate(record.decisionDate)
-  const details: { label: string; value: string }[] = [
-    { label: 'Court', value: record.court },
-    { label: 'Jurisdiction', value: record.jurisdiction },
-    { label: 'Code', value: record.code },
-    { label: 'Decided', value: date ?? 'Date not recorded' },
-    { label: 'Listed by', value: record.source ?? 'Not recorded' },
-    { label: 'Source document', value: 'No PDF attached to this sample record' },
-  ]
+  const handleEdit = () => {
+    if (!isAuthenticated) {
+      notify('Please log in to edit case records.', 'info')
+      return
+    }
+    openDialog({ kind: 'form', caseId: record.id })
+  }
+
+  const displayDate = record.decidedDisplay || formatDate(record.decisionDate) || 'Not recorded'
 
   return (
-    <article>
+    <article className="bg-white">
       {backBar}
 
-      <header className="frame grid swiss-cols gap-y-6 pb-10 pt-8 md:pb-14 md:pt-10">
-        <div className="md:col-span-3">
-          <p className="label-caps text-ink">
-            <span aria-hidden="true">— </span>Case Record
-          </p>
-          {record.needsReview ? (
-            <p className="label-caps mt-3 inline-flex items-center gap-2 border-2 border-accent bg-accent-subtle px-3 py-1.5 font-black text-accent">
-              <span className="size-2 bg-accent" aria-hidden="true" />
-              Needs review
-            </p>
-          ) : (
-            <p className="label-caps mt-3 inline-flex items-center gap-2 border-2 border-ink bg-surface px-3 py-1.5 text-ink">
-              Verified record
-            </p>
-          )}
+      {/* CASE DOSSIER HEADER */}
+      <section
+        aria-label="Case Header"
+        className="grid grid-cols-1 md:grid-cols-[118px_1fr] lg:grid-cols-[132px_1fr] border-b-[1.5px] border-black"
+      >
+        {/* Left Section Rail */}
+        <div className="md:border-r-[1.5px] border-b md:border-b-0 border-black px-4 sm:px-5 py-4 md:py-8 bg-white">
+          <div className="text-[11px] font-extrabold tracking-[0.1em] uppercase text-[#D91C1F] leading-[1.35]">
+            <div>01 /</div>
+            <div>DOSSIER</div>
+          </div>
         </div>
 
-        <div className="min-w-0 md:col-span-9">
-          <div className="border border-ink/20 bg-surface px-3 py-1.5 inline-block">
-            <p className="label-caps text-ink-subtle">
-              Illustrative sample record · Not a verified judgment
-            </p>
+        {/* Dossier Content */}
+        <div className="px-5 sm:px-8 py-6 sm:py-8">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <span className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-[#D91C1F]">
+              {record.court} — {record.jurisdiction}
+            </span>
+            {record.needsReview ? (
+              <span className="inline-flex items-center gap-1.5 border border-[#D91C1F] px-2.5 py-0.5 text-[9.5px] font-extrabold tracking-[0.11em] uppercase text-[#D91C1F] bg-white">
+                <span className="w-1.5 h-1.5 bg-[#D91C1F] inline-block" />
+                NEEDS REVIEW
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 border border-black px-2.5 py-0.5 text-[9.5px] font-extrabold tracking-[0.11em] uppercase text-black bg-white">
+                VERIFIED PRECEDENT
+              </span>
+            )}
           </div>
-          <h1 className="mt-4 max-w-[28ch] text-balance text-[clamp(2rem,5vw,4.25rem)] font-[850] leading-[0.98] tracking-[-0.035em] text-ink">
+
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-black tracking-[-0.03em] leading-tight">
             {record.title}
           </h1>
 
-          <dl className="mt-8 grid border-t-2 border-ink sm:grid-cols-2 sm:gap-x-[var(--dp-spacing-gutter)]">
-            <div className="min-w-0 py-5">
-              <dt className="label-caps text-ink-subtle">Citation</dt>
-              <dd className="mt-2 break-words font-mono text-[22px] font-bold leading-[1.2] tracking-tight text-ink">
-                {record.citation ?? 'Not available'}
-              </dd>
-            </div>
-            <div className="min-w-0 border-t-2 border-rule-soft py-5 sm:border-t-0">
-              <dt className="label-caps text-ink-subtle">Case number</dt>
-              <dd className="mt-2 break-words font-mono text-[22px] font-bold leading-[1.2] tracking-tight text-ink">
-                {record.caseNumber ?? 'Not available'}
-              </dd>
-            </div>
-          </dl>
+          <div className="text-sm font-semibold text-neutral-500 mt-2 mb-6">
+            {record.citation || record.caseNumber}
+          </div>
 
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" onClick={copyReference} className={primaryButtonClass}>
-              <Copy className="size-4" aria-hidden="true" />
-              Copy reference
+          {/* Action Row */}
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={handleToggleReview}
+              className="border border-black px-4 h-10 text-[11px] font-extrabold tracking-[0.12em] uppercase text-black hover:bg-neutral-100 transition-colors cursor-pointer"
+            >
+              {record.needsReview ? 'MARK AS VERIFIED' : 'FLAG FOR REVIEW'}
             </button>
             <button
               type="button"
-              onClick={() => openDialog({ kind: 'form', caseId: record.id })}
-              className={secondaryButtonClass}
+              onClick={handleEdit}
+              className="bg-[#D91C1F] hover:bg-[#b51518] text-white px-5 h-10 text-[11px] font-extrabold tracking-[0.12em] uppercase transition-colors cursor-pointer"
             >
-              <Pencil className="size-4" aria-hidden="true" />
-              Edit record
+              ✎ EDIT RECORD
             </button>
           </div>
         </div>
-      </header>
+      </section>
 
-      <Section label="Record details">
-        <dl className="grid gap-x-[var(--dp-spacing-gutter)] sm:grid-cols-2 xl:grid-cols-3">
-          {details.map((item) => (
-            <div key={item.label} className="min-w-0 border-t-2 border-rule-soft py-5">
-              <dt className="label-caps text-ink-subtle">{item.label}</dt>
-              <dd className="mt-2 break-words text-[17px] font-bold leading-[1.3] text-ink">
-                {item.value}
-              </dd>
-            </div>
-          ))}
-          <div className="min-w-0 border-t-2 border-rule-soft py-5">
-            <dt className="label-caps text-ink-subtle">Review status</dt>
-            <dd className="mt-2 text-[17px] font-bold leading-[1.3]">
-              {record.needsReview ? (
-                <span className="inline-flex items-center gap-2 font-black text-accent">
-                  <span className="size-2.5 bg-accent" aria-hidden="true" />
-                  Flagged for review
-                </span>
-              ) : (
-                <span className="text-ink">No review flagged</span>
-              )}
-            </dd>
+      {/* METADATA GRID */}
+      <section
+        aria-label="Metadata Grid"
+        className="grid grid-cols-1 md:grid-cols-[118px_1fr] lg:grid-cols-[132px_1fr] border-b-[1.5px] border-black"
+      >
+        <div className="md:border-r-[1.5px] border-b md:border-b-0 border-black px-4 sm:px-5 py-4 md:py-6 bg-white">
+          <div className="text-[11px] font-extrabold tracking-[0.1em] uppercase text-[#D91C1F] leading-[1.35]">
+            <div>02 /</div>
+            <div>RECORD</div>
+            <div>DETAILS</div>
           </div>
-        </dl>
-      </Section>
+        </div>
 
-      <Section label="Summary">
-        <p className="max-w-[62ch] text-[18px] leading-[1.6] text-ink">{record.summary}</p>
-      </Section>
+        <div className="px-5 sm:px-8 py-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-neutral-400">
+                PRIMARY CODE
+              </div>
+              <div className="text-sm font-extrabold text-black mt-1">
+                {record.code}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-neutral-400">
+                DECISION DATE
+              </div>
+              <div className="text-sm font-extrabold text-black mt-1">
+                {displayDate}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-neutral-400">
+                BENCH / CORAM
+              </div>
+              <div className="text-sm font-bold text-neutral-800 mt-1">
+                {record.bench || 'Division / Single Bench'}
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold tracking-[0.12em] uppercase text-neutral-400">
+                LISTED BY
+              </div>
+              <div className="text-sm font-medium text-neutral-800 mt-1">
+                {record.source || 'Official Law Reports'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      <Section label="Legal topics">
-        {record.tags.length > 0 ? (
-          <ul className="flex max-w-[72ch] flex-wrap gap-2">
-            {record.tags.map((tag) => (
-              <li
-                key={tag}
-                className="max-w-full bg-surface px-3 py-1.5 text-[14px] leading-snug text-ink"
-              >
-                {tag}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-[15px] text-ink-muted">No topics have been added.</p>
-        )}
-      </Section>
+      {/* HEADNOTE & RATIO */}
+      <section
+        aria-label="Headnote"
+        className="grid grid-cols-1 md:grid-cols-[118px_1fr] lg:grid-cols-[132px_1fr] border-b-[1.5px] border-black"
+      >
+        <div className="md:border-r-[1.5px] border-b md:border-b-0 border-black px-4 sm:px-5 py-4 md:py-6 bg-white">
+          <div className="text-[11px] font-extrabold tracking-[0.1em] uppercase text-[#D91C1F] leading-[1.35]">
+            <div>03 /</div>
+            <div>HEADNOTE</div>
+            <div>&amp; RATIO</div>
+          </div>
+        </div>
 
-      <div className="border-t-2 border-ink" />
+        <div className="px-5 sm:px-8 py-6 sm:py-8 max-w-4xl">
+          <p className="text-base sm:text-[17px] text-neutral-800 leading-relaxed font-normal">
+            {record.fullNotes || record.summary}
+          </p>
+        </div>
+      </section>
+
+      {/* INDEXED LEGAL TOPICS */}
+      <section
+        aria-label="Legal Topics"
+        className="grid grid-cols-1 md:grid-cols-[118px_1fr] lg:grid-cols-[132px_1fr] border-b-[1.5px] border-black"
+      >
+        <div className="md:border-r-[1.5px] border-b md:border-b-0 border-black px-4 sm:px-5 py-4 md:py-6 bg-white">
+          <div className="text-[11px] font-extrabold tracking-[0.1em] uppercase text-[#D91C1F] leading-[1.35]">
+            <div>04 /</div>
+            <div>INDEXED</div>
+            <div>TOPICS</div>
+          </div>
+        </div>
+
+        <div className="px-5 sm:px-8 py-6 sm:py-8">
+          {record.tags && record.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-2.5">
+              {record.tags.map((topic, i) => (
+                <span
+                  key={i}
+                  className="border border-black px-3 py-1.5 text-xs font-semibold text-black bg-neutral-50 tracking-wide"
+                >
+                  {topic}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-neutral-500">No legal topics indexed for this record.</p>
+          )}
+        </div>
+      </section>
     </article>
   )
 }

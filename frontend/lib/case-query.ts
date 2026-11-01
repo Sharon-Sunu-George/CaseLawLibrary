@@ -11,7 +11,8 @@ export const DEFAULT_FILTERS: CaseFilters = {
 export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: 'date-desc', label: 'Decision date, newest first' },
   { value: 'date-asc', label: 'Decision date, oldest first' },
-  { value: 'title-asc', label: 'Title, A to Z' },
+  { value: 'title-asc', label: 'Case title, A–Z' },
+  { value: 'court-asc', label: 'Court, A–Z' },
 ]
 
 type ParamsReader = { get(name: string): string | null }
@@ -78,6 +79,7 @@ export function searchCases(
 
   return matches.sort((a, b) => {
     if (filters.sort === 'title-asc') return a.title.localeCompare(b.title)
+    if (filters.sort === 'court-asc') return a.court.localeCompare(b.court)
     // Records without a date always sort last.
     if (!a.decisionDate && !b.decisionDate) return 0
     if (!a.decisionDate) return 1

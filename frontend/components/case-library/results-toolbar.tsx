@@ -3,11 +3,11 @@
 import { X } from 'lucide-react'
 import { SORT_OPTIONS, formatCount, hasActiveFilters } from '@/lib/case-query'
 import type { CaseFilters, SortKey } from '@/lib/case-types'
-import { SelectField } from './ui'
 
 type Props = {
   filters: CaseFilters
   count: number
+  totalCount: number
   searching: boolean
   onRemove: (patch: Partial<CaseFilters>) => void
   onClearAll: () => void
@@ -17,6 +17,7 @@ type Props = {
 export function ResultsToolbar({
   filters,
   count,
+  totalCount,
   searching,
   onRemove,
   onClearAll,
@@ -33,68 +34,106 @@ export function ResultsToolbar({
     chips.push({ key: 'review', label: 'Needs review only', patch: { reviewOnly: false } })
 
   return (
-    <div className="grid swiss-cols gap-y-4">
-      <div className="min-w-0 md:col-span-3">
-        <p className="label-caps flex items-center gap-2 text-ink">
-          <span className="size-2 bg-accent" aria-hidden="true" />
-          <span className="font-black text-ink">03</span>
-          <span className="text-ink-subtle">Results Index</span>
-        </p>
-        <p
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className="mt-2 break-words text-[clamp(2rem,3.5vw,2.75rem)] font-[850] leading-none tracking-[-0.04em] text-ink"
-        >
-          {searching ? 'Searching…' : formatCount(count)}
-          {!searching && !hasActiveFilters(filters) && (
-            <span className="mt-2 block text-[13px] font-medium tracking-normal text-ink-subtle">
-              indexed cases in library
-            </span>
-          )}
-        </p>
-      </div>
+    <div>
+      <section
+        aria-label="Results Summary and Sort"
+        className="grid grid-cols-1 md:grid-cols-[118px_1fr] lg:grid-cols-[132px_1fr] border-b-[1.5px] border-black"
+      >
+        {/* Left Section Rail 03 */}
+        <div className="md:border-r-[1.5px] border-b md:border-b-0 border-black px-4 sm:px-5 py-3 md:py-5 bg-white">
+          <div className="text-[11px] font-extrabold tracking-[0.1em] uppercase text-[#D91C1F] leading-[1.35]">
+            <div>03 /</div>
+            <div>RESULTS</div>
+            <div>INDEX</div>
+          </div>
+        </div>
 
-      <div className="grid min-w-0 grid-cols-1 gap-x-[var(--dp-spacing-gutter)] gap-y-4 md:col-span-9 md:grid-cols-9">
-        {chips.length > 0 && (
-          <ul
-            className="flex min-w-0 flex-wrap content-start items-center gap-2 md:col-span-9 xl:col-span-6 xl:col-start-1 xl:row-start-1"
-            aria-label="Active filters"
-          >
-            {chips.map((chip) => (
-              <li key={chip.key} className="max-w-full">
-                <button
-                  type="button"
-                  onClick={() => onRemove(chip.patch)}
-                  aria-label={`Remove filter ${chip.label}`}
-                  className="inline-flex min-h-9 max-w-full items-center gap-2 border-2 border-ink bg-ink px-3 py-1 text-left text-[12px] font-extrabold uppercase tracking-wide text-ground hover:bg-accent hover:border-accent hover:text-ground transition-colors"
-                >
-                  <span className="min-w-0 break-words">{chip.label}</span>
-                  <X className="size-3.5 shrink-0" strokeWidth={3} aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-            <li>
-              <button
-                type="button"
-                onClick={onClearAll}
-                className="inline-flex min-h-9 items-center px-1 text-[12px] font-extrabold uppercase tracking-wider text-accent underline decoration-2 underline-offset-4 hover:text-ink transition-colors"
+        {/* High-Contrast Black Results Bar */}
+        <div className="bg-[#0A0A0A] text-white px-5 sm:px-8 py-4 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-8 sm:gap-16">
+            <div>
+              <div
+                role="status"
+                aria-live="polite"
+                className="text-[28px] sm:text-[34px] font-extrabold tracking-[-0.03em] leading-none text-white"
               >
-                Clear all filters
-              </button>
-            </li>
-          </ul>
-        )}
+                {searching ? 'Searching…' : `${count} ${count === 1 ? 'case' : 'cases'}`}
+              </div>
+              <div className="text-[12px] text-neutral-300 mt-1.5">
+                {hasActiveFilters(filters)
+                  ? `Matching records (of ${totalCount} indexed)`
+                  : 'Indexed cases in library'}
+              </div>
+            </div>
+            <div className="hidden md:block w-[1px] h-12 bg-neutral-600" aria-hidden="true" />
+          </div>
 
-        <SelectField
-          id="sort-select"
-          label="Sort order"
-          className="md:col-span-5 xl:col-span-3 xl:col-start-7 xl:row-start-1"
-          value={filters.sort}
-          onChange={(sort) => onSort(sort as SortKey)}
-          options={SORT_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-        />
-      </div>
+          {/* Sort By Dropdown */}
+          <div className="w-full sm:w-auto">
+            <label
+              htmlFor="sort-cases-select"
+              className="block text-[10px] font-extrabold tracking-[0.14em] uppercase text-neutral-300 mb-1.5"
+            >
+              SORT BY
+            </label>
+            <div className="relative">
+              <select
+                id="sort-cases-select"
+                value={filters.sort}
+                onChange={(e) => onSort(e.target.value as SortKey)}
+                className="w-full sm:min-w-[238px] h-9 px-3.5 pr-9 bg-white text-black text-[12.5px] font-medium appearance-none focus:outline-none cursor-pointer"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <svg
+                className="w-3.5 h-3.5 text-black pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="square" strokeLinejoin="miter" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Active Filter Chips bar if any */}
+      {chips.length > 0 && (
+        <div
+          className="bg-neutral-100 border-b-[1.5px] border-black px-5 sm:px-8 py-2.5 flex flex-wrap items-center gap-2 text-xs"
+          aria-label="Active filters"
+        >
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-neutral-500 mr-1">
+            Active:
+          </span>
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => onRemove(chip.patch)}
+              aria-label={`Remove filter ${chip.label}`}
+              className="inline-flex items-center gap-1.5 bg-white border border-black px-2.5 py-1 text-[11px] font-bold text-black hover:bg-[#D91C1F] hover:border-[#D91C1F] hover:text-white transition-colors cursor-pointer"
+            >
+              <span>{chip.label}</span>
+              <X className="w-3 h-3" />
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="text-[11px] font-extrabold uppercase tracking-wider text-[#D91C1F] underline underline-offset-2 ml-2 hover:text-black cursor-pointer"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -19,13 +19,15 @@ import { ResultsToolbar } from './results-toolbar'
 
 type Phase = 'idle' | 'loading' | 'error'
 
-const SIMULATED_LATENCY_MS = 400
+const SIMULATED_LATENCY_MS = 250
 
 export function LibraryView() {
   const router = useRouter()
   const params = useSearchParams()
   const { cases, setLastQuery } = useLibrary()
   const [phase, setPhase] = useState<Phase>('idle')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState<5 | 10>(5)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const filters = useMemo(() => parseFilters(params), [params])
@@ -43,11 +45,11 @@ export function LibraryView() {
     (next: CaseFilters) => {
       const qs = filtersToQueryString(next)
       router.replace(qs ? `/?${qs}` : '/', { scroll: false })
+      setCurrentPage(1)
     },
     [router],
   )
 
-  // Search and Clear simulate a short round trip so loading is a real state.
   const commitWithLatency = useCallback(
     (next: CaseFilters) => {
       clearTimeout(timer.current)
@@ -67,6 +69,18 @@ export function LibraryView() {
 
   const retry = () => commitWithLatency(filters)
 
+  const handleTagClick = (tag: string) => {
+    commitWithLatency({ ...filters, query: tag })
+  }
+
+  // Pagination calculation
+  const totalPages = Math.max(1, Math.ceil(results.length / pageSize))
+  const safePage = Math.min(currentPage, totalPages)
+  const paginatedCases = useMemo(() => {
+    const start = (safePage - 1) * pageSize
+    return results.slice(start, start + pageSize)
+  }, [results, safePage, pageSize])
+
   const appliedKey = filtersToQueryString({ ...filters, sort: DEFAULT_FILTERS.sort })
 
   return (
@@ -85,36 +99,91 @@ export function LibraryView() {
         <h2 id="results-heading" className="sr-only">
           Results
         </h2>
-        <div className="border-b-2 border-ink">
-          <div className="frame py-6">
-            <ResultsToolbar
-              filters={filters}
-              count={results.length}
-              searching={phase === 'loading'}
-              onRemove={(patch) => writeUrl({ ...filters, ...patch })}
-              onClearAll={clearAll}
-              onSort={(sort) => writeUrl({ ...filters, sort })}
+        <ResultsToolbar
+          filters={filters}
+          count={results.length}
+          totalCount={cases.length}
+          searching={phase === 'loading'}
+          onRemove={(patch) => writeUrl({ ...filters, ...patch })}
+          onClearAll={clearAll}
+          onSort={(sort) => writeUrl({ ...filters, sort })}
+        />
+
+        {phase === 'loading' && <LoadingState />}
+        {phase === 'error' && <ErrorState onRetry={retry} />}
+        {phase === 'idle' && results.length === 0 && <EmptyState onReset={clearAll} />}
+        {phase === 'idle' && results.length > 0 && (
+          <>
+            <CaseList
+              cases={paginatedCases}
+              currentPage={safePage}
+              pageSize={pageSize}
+              onTagClick={handleTagClick}
             />
-          </div>
-        </div>
 
-        <div className="frame pb-16">
-          {phase === 'loading' && <LoadingState />}
-          {phase === 'error' && <ErrorState onRetry={retry} />}
-          {phase === 'idle' && results.length === 0 && <EmptyState onReset={clearAll} />}
-          {phase === 'idle' && results.length > 0 && <CaseList cases={results} />}
+            {/* PAGINATION & DISPLAY BAR */}
+            {results.length > 5 && (
+              <div className="border-b-[1.5px] border-black bg-white px-5 sm:px-7 py-3 flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div className="flex items-center gap-2 text-neutral-600">
+                  <span className="font-extrabold text-black uppercase tracking-[0.1em] text-[10.5px]">
+                    SHOWING {(safePage - 1) * pageSize + 1}–
+                    {Math.min(safePage * pageSize, results.length)} OF {results.length}
+                  </span>
+                </div>
 
-          <p className="mt-6 text-[13px] text-ink-muted">
-            Prototype tool:{' '}
-            <button
-              type="button"
-              onClick={() => setPhase('error')}
-              className="font-bold text-ink underline decoration-2 underline-offset-4 hover:bg-ink hover:text-ground"
-            >
-              Preview the error state
-            </button>
-          </p>
-        </div>
+                <div className="flex items-center gap-2">
+                  {pageSize === 5 && totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={safePage <= 1}
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        className="px-2.5 h-7 border border-black text-[10.5px] font-extrabold uppercase tracking-wider disabled:opacity-35 hover:bg-black hover:text-white transition-colors cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        PREV
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-7 h-7 border text-[11px] font-extrabold transition-colors cursor-pointer ${
+                            pageNum === safePage
+                              ? 'bg-[#D91C1F] border-[#D91C1F] text-white'
+                              : 'bg-white border-black text-black hover:bg-neutral-100'
+                          }`}
+                        >
+                          {String(pageNum).padStart(2, '0')}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={safePage >= totalPages}
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        className="px-2.5 h-7 border border-black text-[10.5px] font-extrabold uppercase tracking-wider disabled:opacity-35 hover:bg-black hover:text-white transition-colors cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        NEXT
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPageSize((prev) => (prev === 5 ? 10 : 5))
+                      setCurrentPage(1)
+                    }}
+                    className="px-3 h-7 border border-black text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-black hover:text-white transition-colors cursor-pointer"
+                  >
+                    {pageSize === 5
+                      ? `VIEW ALL (${results.length})`
+                      : 'COMPACT VIEW (5 / PAGE)'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </section>
     </>
   )

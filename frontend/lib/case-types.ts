@@ -8,6 +8,9 @@ export type CaseRecord = {
   code: string
   /** ISO date, YYYY-MM-DD */
   decisionDate?: string
+  decidedDisplay?: string
+  bench?: string
+  fullNotes?: string
   summary: string
   tags: string[]
   needsReview: boolean
@@ -15,7 +18,7 @@ export type CaseRecord = {
   source?: string
 }
 
-export type SortKey = 'date-desc' | 'date-asc' | 'title-asc'
+export type SortKey = 'date-desc' | 'date-asc' | 'title-asc' | 'court-asc'
 
 export type CaseFilters = {
   query: string
@@ -24,3 +27,4 @@ export type CaseFilters = {
   reviewOnly: boolean
   sort: SortKey
 }
+
