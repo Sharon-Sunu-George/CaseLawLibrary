@@ -1,14 +1,62 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Download, ExternalLink, FileText } from 'lucide-react'
 import { formatDate } from '@/lib/case-query'
+import { formatFileSize, getDocument, type StoredDocument } from '@/lib/document-storage'
 import { useLibrary } from './library-provider'
 
 export function CaseDetailView({ id }: { id: string }) {
-  const { cases, lastQuery, openDialog, saveCase, notify, isAuthenticated } = useLibrary()
+  const { cases, lastQuery, openDialog, saveCase, notify, isAuthenticated, isHydrated } = useLibrary()
   const record = cases.find((item) => item.id === id)
   const backHref = lastQuery ? `/?${lastQuery}` : '/'
+
+  const [docRecord, setDocRecord] = useState<StoredDocument | null>(null)
+  const [docUrl, setDocUrl] = useState<string | null>(null)
+  const [isLoadingDoc, setIsLoadingDoc] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    let objectUrl: string | null = null
+
+    if (record?.pdfMetadata) {
+      setIsLoadingDoc(true)
+      const lookupKey = record.pdfMetadata.documentId || record.id
+      getDocument(lookupKey, record.id)
+        .then((doc) => {
+          if (!active) return
+          setDocRecord(doc)
+          if (doc?.blob) {
+            objectUrl = URL.createObjectURL(doc.blob)
+            setDocUrl(objectUrl)
+          } else {
+            setDocUrl(null)
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to load PDF document from storage:', err)
+          if (active) {
+            setDocRecord(null)
+            setDocUrl(null)
+          }
+        })
+        .finally(() => {
+          if (active) setIsLoadingDoc(false)
+        })
+    } else {
+      setDocRecord(null)
+      setDocUrl(null)
+      setIsLoadingDoc(false)
+    }
+
+    return () => {
+      active = false
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
+      }
+    }
+  }, [record?.id, record?.pdfMetadata?.documentId, record?.pdfMetadata?.uploadedAt])
 
   const backBar = (
     <div className="border-b-[1.5px] border-black bg-white px-5 sm:px-8 py-3">
@@ -21,6 +69,22 @@ export function CaseDetailView({ id }: { id: string }) {
       </Link>
     </div>
   )
+
+  if (!record && !isHydrated) {
+    return (
+      <div className="min-h-[60vh] flex flex-col bg-white">
+        {backBar}
+        <div className="px-6 py-16 text-center border-b-[1.5px] border-black bg-white flex-1 flex flex-col items-center justify-center">
+          <div className="text-[11px] font-extrabold tracking-[0.14em] uppercase text-neutral-400 mb-2">
+            00 / LOADING DOSSIER
+          </div>
+          <div className="text-xs text-neutral-500">
+            Reading research index from storage…
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!record) {
     return (
@@ -45,12 +109,12 @@ export function CaseDetailView({ id }: { id: string }) {
     )
   }
 
-  const handleToggleReview = () => {
+  const handleToggleReview = async () => {
     const updated = {
       ...record,
       needsReview: !record.needsReview,
     }
-    saveCase(updated, false)
+    await saveCase(updated, false)
     notify(
       updated.needsReview
         ? `Flagged "${record.title}" for review.`
@@ -202,6 +266,110 @@ export function CaseDetailView({ id }: { id: string }) {
         </div>
       </section>
 
+      {/* JUDGMENT DOCUMENT */}
+      <section
+        aria-label="Judgment Document"
+        className="grid grid-cols-1 md:grid-cols-[118px_1fr] lg:grid-cols-[132px_1fr] border-b-[1.5px] border-black"
+      >
+        <div className="md:border-r-[1.5px] border-b md:border-b-0 border-black px-4 sm:px-5 py-4 md:py-6 bg-white">
+          <div className="text-[11px] font-extrabold tracking-[0.1em] uppercase text-[#D91C1F] leading-[1.35]">
+            <div>04 /</div>
+            <div>JUDGMENT</div>
+            <div>DOCUMENT</div>
+          </div>
+        </div>
+
+        <div className="px-5 sm:px-8 py-6">
+          {isLoadingDoc ? (
+            <div className="border border-black p-10 text-center bg-neutral-50 flex flex-col items-center justify-center min-h-[200px]">
+              <div className="text-[11px] font-extrabold tracking-[0.14em] uppercase text-neutral-400 mb-2">
+                LOADING ATTACHED PDF
+              </div>
+              <p className="text-xs text-neutral-600">
+                Retrieving judgment document from local storage…
+              </p>
+            </div>
+          ) : docUrl && record.pdfMetadata ? (
+            <div className="space-y-3">
+              {/* Document Header Bar */}
+              <div className="border border-black bg-neutral-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <FileText className="w-4 h-4 text-[#D91C1F] shrink-0" />
+                  <span className="text-xs font-bold text-black truncate max-w-[280px] sm:max-w-md">
+                    {record.pdfMetadata.fileName}
+                  </span>
+                  <span className="text-[10px] text-neutral-500 uppercase tracking-wider shrink-0">
+                    ({formatFileSize(record.pdfMetadata.fileSize)})
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <a
+                    href={docUrl}
+                    download={record.pdfMetadata.fileName}
+                    className="inline-flex items-center gap-1.5 border border-black bg-white px-3 py-1.5 text-[10px] font-extrabold tracking-[0.1em] uppercase text-black hover:bg-neutral-100 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>DOWNLOAD</span>
+                  </a>
+                  <a
+                    href={docUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 bg-black text-white px-3 py-1.5 text-[10px] font-extrabold tracking-[0.1em] uppercase hover:bg-[#D91C1F] transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>OPEN IN NEW TAB</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* PDF Preview Frame */}
+              <div className="border border-black bg-neutral-100 overflow-hidden">
+                <iframe
+                  src={`${docUrl}#view=FitH`}
+                  title={`Judgment PDF - ${record.title}`}
+                  className="w-full h-[600px] border-none block"
+                />
+              </div>
+            </div>
+          ) : record.pdfMetadata && !docRecord ? (
+            <div className="border border-black p-8 text-center bg-white flex flex-col items-center justify-center">
+              <div className="text-[11px] font-extrabold tracking-[0.14em] uppercase text-[#D91C1F] mb-1.5">
+                DOCUMENT DATA UNAVAILABLE
+              </div>
+              <p className="text-xs text-neutral-600 mb-4 max-w-md">
+                The metadata references &ldquo;{record.pdfMetadata.fileName}&rdquo;, but the file binary was not found in browser storage.
+              </p>
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="bg-black text-white hover:bg-[#D91C1F] text-[11px] font-extrabold tracking-[0.12em] uppercase px-4 h-9 inline-flex items-center transition-colors cursor-pointer"
+              >
+                ATTACH REPLACEMENT PDF
+              </button>
+            </div>
+          ) : (
+            <div className="border border-dashed border-neutral-300 p-8 text-center bg-white flex flex-col items-center justify-center">
+              <FileText className="w-7 h-7 text-neutral-300 mb-2" />
+              <div className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-neutral-500 mb-1">
+                NO JUDGMENT DOCUMENT ATTACHED
+              </div>
+              <p className="text-xs text-neutral-400 mb-4 max-w-sm">
+                Attach an official PDF copy of the judgment to view it inline alongside this dossier.
+              </p>
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="border border-black hover:border-[#D91C1F] hover:text-[#D91C1F] text-black text-[11px] font-extrabold tracking-[0.12em] uppercase px-4 h-9 inline-flex items-center transition-colors cursor-pointer"
+              >
+                + ATTACH PDF DOCUMENT
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* INDEXED LEGAL TOPICS */}
       <section
         aria-label="Legal Topics"
@@ -209,7 +377,7 @@ export function CaseDetailView({ id }: { id: string }) {
       >
         <div className="md:border-r-[1.5px] border-b md:border-b-0 border-black px-4 sm:px-5 py-4 md:py-6 bg-white">
           <div className="text-[11px] font-extrabold tracking-[0.1em] uppercase text-[#D91C1F] leading-[1.35]">
-            <div>04 /</div>
+            <div>05 /</div>
             <div>INDEXED</div>
             <div>TOPICS</div>
           </div>
