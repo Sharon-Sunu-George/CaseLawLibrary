@@ -1,3 +1,11 @@
+export type DocumentMetadata = {
+  documentId?: string
+  fileName: string
+  fileSize: number // bytes
+  uploadedAt: string // ISO date
+  mimeType: string
+}
+
 export type CaseRecord = {
   id: string
   title: string
@@ -16,6 +24,8 @@ export type CaseRecord = {
   needsReview: boolean
   /** Name of the publication the reference screenshot attributed the record to */
   source?: string
+  /** Optional document metadata (binary is stored separately in IndexedDB) */
+  pdfMetadata?: DocumentMetadata
 }
 
 export type SortKey = 'date-desc' | 'date-asc' | 'title-asc' | 'court-asc'
@@ -28,3 +38,19 @@ export type CaseFilters = {
   sort: SortKey
 }
 
+export type BackupDocumentItem = {
+  caseId: string
+  documentId?: string
+  metadata: DocumentMetadata
+  base64Data: string
+}
+
+export type LibraryBackupPackage = {
+  version: 1
+  generator: string
+  timestamp: string
+  casesCount: number
+  documentsCount: number
+  cases: CaseRecord[]
+  documents: BackupDocumentItem[]
+}

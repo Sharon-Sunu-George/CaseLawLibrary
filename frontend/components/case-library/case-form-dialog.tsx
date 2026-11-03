@@ -1,11 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import { FileText, Upload } from 'lucide-react'
 import type { CaseRecord } from '@/lib/case-types'
+import {
+  MAX_PDF_SIZE_DISPLAY,
+  formatFileSize,
+  validatePdfFile,
+} from '@/lib/document-storage'
 import { useLibrary } from './library-provider'
 import { Field, Modal, controlClass, primaryButtonClass, secondaryButtonClass } from './ui'
 
-type Errors = Partial<Record<'title' | 'court' | 'jurisdiction' | 'code' | 'summary', string>>
+type Errors = Partial<Record<'title' | 'citation' | 'court' | 'jurisdiction' | 'code' | 'summary', string>>
 
 type Props = { open: boolean; caseId?: string; onClose: () => void }
 
@@ -41,6 +47,13 @@ function CaseForm({ existing, onClose }: { existing?: CaseRecord; onClose: () =>
   const [needsReview, setNeedsReview] = useState(existing?.needsReview ?? false)
   const [errors, setErrors] = useState<Errors>({})
 
+  // PDF Document State
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [removeExistingPdf, setRemoveExistingPdf] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+
   const formatDisplayDate = (isoDate: string): string => {
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const parts = isoDate.split('-')
@@ -52,11 +65,32 @@ function CaseForm({ existing, onClose }: { existing?: CaseRecord; onClose: () =>
     return `${String(day).padStart(2, '0')} ${MONTHS[monthIndex]} ${year}`
   }
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSelectedFile = (file: File) => {
+    const validation = validatePdfFile(file)
+    if (!validation.valid) {
+      setPdfError(validation.error || 'Invalid PDF file.')
+      return
+    }
+    setPdfError(null)
+    setPendingFile(file)
+    setRemoveExistingPdf(false)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleSelectedFile(file)
+    }
+    e.target.value = ''
+  }
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (isSubmitting) return
+
     const next: Errors = {}
     if (!title.trim()) next.title = 'Enter the case title.'
-    if (!citation.trim()) next.court = 'Enter citation or case number.'
+    if (!citation.trim()) next.citation = 'Enter citation or case number.'
     if (!court.trim()) next.court = 'Enter the court.'
     if (!jurisdiction.trim()) next.jurisdiction = 'Enter the jurisdiction.'
     if (!summary.trim()) next.summary = 'Enter a headnote summary.'
@@ -68,11 +102,31 @@ function CaseForm({ existing, onClose }: { existing?: CaseRecord; onClose: () =>
       .map((t) => t.trim())
       .filter(Boolean)
 
+    const trimmedCitation = citation.trim()
+    let finalCitation: string | undefined = trimmedCitation
+    let finalCaseNumber: string | undefined = existing?.caseNumber
+
+    if (existing) {
+      if (existing.caseNumber && existing.citation && existing.caseNumber !== existing.citation) {
+        finalCitation = trimmedCitation
+        finalCaseNumber = existing.caseNumber
+      } else if (existing.caseNumber && !existing.citation) {
+        finalCitation = undefined
+        finalCaseNumber = trimmedCitation
+      } else {
+        finalCitation = trimmedCitation
+        finalCaseNumber = trimmedCitation
+      }
+    } else {
+      finalCitation = trimmedCitation
+      finalCaseNumber = trimmedCitation
+    }
+
     const record: CaseRecord = {
       id: existing?.id ?? `case-${Date.now()}`,
       title: title.trim(),
-      citation: citation.trim(),
-      caseNumber: citation.trim(),
+      citation: finalCitation,
+      caseNumber: finalCaseNumber,
       court: court.trim(),
       jurisdiction: jurisdiction.trim(),
       code: code.trim() || 'Other',
@@ -84,17 +138,35 @@ function CaseForm({ existing, onClose }: { existing?: CaseRecord; onClose: () =>
       tags: parsedTopics.length > 0 ? parsedTopics : ['general precedent'],
       needsReview,
       source: existing?.source ?? 'Verdictum',
+      pdfMetadata: existing?.pdfMetadata,
     }
 
-    saveCase(record, isNew)
-    onClose()
+    try {
+      setIsSubmitting(true)
+      await saveCase(record, isNew, {
+        file: pendingFile || undefined,
+        removeExisting: removeExistingPdf,
+      })
+      onClose()
+    } catch (err) {
+      console.error('Failed to save case:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleDelete = () => {
-    if (!existing) return
+  const handleDelete = async () => {
+    if (!existing || isSubmitting) return
     if (window.confirm(`Are you sure you want to delete "${existing.title}"?`)) {
-      deleteCase(existing.id, existing.title)
-      onClose()
+      try {
+        setIsSubmitting(true)
+        await deleteCase(existing.id, existing.title)
+        onClose()
+      } catch (err) {
+        console.error('Failed to delete case:', err)
+      } finally {
+        setIsSubmitting(false)
+      }
     }
   }
 
@@ -207,6 +279,120 @@ function CaseForm({ existing, onClose }: { existing?: CaseRecord; onClose: () =>
           </Field>
         </div>
 
+        {/* PDF ATTACHMENT SECTION */}
+        <div className="sm:col-span-2">
+          <label className="block text-[11px] font-extrabold tracking-[0.14em] uppercase text-black mb-1.5">
+            JUDGMENT PDF DOCUMENT
+          </label>
+          {pendingFile ? (
+            <div className="border border-black p-3.5 bg-neutral-50 flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <FileText className="w-5 h-5 text-[#D91C1F] shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-black truncate">{pendingFile.name}</div>
+                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                    {formatFileSize(pendingFile.size)} • Ready to upload
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingFile(null)
+                  setPdfError(null)
+                }}
+                className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#D91C1F] hover:underline px-2 py-1 ml-2 shrink-0 cursor-pointer"
+              >
+                REMOVE
+              </button>
+            </div>
+          ) : existing?.pdfMetadata && !removeExistingPdf ? (
+            <div className="border border-black p-3.5 bg-neutral-50 flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <FileText className="w-5 h-5 text-black shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-black truncate">
+                    {existing.pdfMetadata.fileName}
+                  </div>
+                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                    {formatFileSize(existing.pdfMetadata.fileSize)} • Attached
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 ml-2 shrink-0">
+                <label className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-black hover:text-[#D91C1F] underline cursor-pointer px-1">
+                  REPLACE
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="sr-only"
+                    onChange={handleFileChange}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setRemoveExistingPdf(true)}
+                  className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-[#D91C1F] hover:underline px-1 cursor-pointer"
+                >
+                  REMOVE
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setIsDragging(true)
+                }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setIsDragging(false)
+                  const file = e.dataTransfer.files?.[0]
+                  if (file) handleSelectedFile(file)
+                }}
+                className={`border-2 border-dashed ${
+                  isDragging ? 'border-[#D91C1F] bg-neutral-50' : 'border-neutral-300 hover:border-black'
+                } p-5 text-center transition-colors cursor-pointer`}
+                onClick={() => document.getElementById('pdf-file-input')?.click()}
+              >
+                <input
+                  id="pdf-file-input"
+                  type="file"
+                  accept="application/pdf"
+                  className="sr-only"
+                  onChange={handleFileChange}
+                />
+                <div className="flex flex-col items-center justify-center gap-1.5">
+                  <Upload className="w-5 h-5 text-neutral-400" />
+                  <div className="text-xs font-bold uppercase tracking-[0.1em] text-black">
+                    CLICK TO ATTACH OR DRAG &amp; DROP PDF
+                  </div>
+                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                    MAXIMUM FILE SIZE: {MAX_PDF_SIZE_DISPLAY}
+                  </div>
+                </div>
+              </div>
+              {removeExistingPdf && existing?.pdfMetadata && (
+                <div className="mt-1.5 text-[11px] text-neutral-500 flex items-center justify-between">
+                  <span>Original PDF will be removed on save.</span>
+                  <button
+                    type="button"
+                    onClick={() => setRemoveExistingPdf(false)}
+                    className="text-[10px] font-bold text-black underline uppercase cursor-pointer"
+                  >
+                    UNDO REMOVAL
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          {pdfError && (
+            <p className="mt-1.5 text-xs font-bold text-[#D91C1F]">{pdfError}</p>
+          )}
+        </div>
+
         <div className="sm:col-span-2 pt-1">
           <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
             <input
@@ -228,7 +414,8 @@ function CaseForm({ existing, onClose }: { existing?: CaseRecord; onClose: () =>
           <button
             type="button"
             onClick={handleDelete}
-            className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-[#D91C1F] hover:underline cursor-pointer"
+            disabled={isSubmitting}
+            className="text-[11px] font-extrabold tracking-[0.12em] uppercase text-[#D91C1F] hover:underline cursor-pointer disabled:opacity-50"
           >
             DELETE RECORD
           </button>
@@ -237,11 +424,20 @@ function CaseForm({ existing, onClose }: { existing?: CaseRecord; onClose: () =>
         )}
 
         <div className="flex items-center gap-3">
-          <button type="button" onClick={onClose} className={secondaryButtonClass}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className={secondaryButtonClass}
+          >
             CANCEL
           </button>
-          <button type="submit" className={primaryButtonClass}>
-            {isNew ? 'CREATE RECORD' : 'SAVE CHANGES'}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className={primaryButtonClass}
+          >
+            {isSubmitting ? 'SAVING…' : isNew ? 'CREATE RECORD' : 'SAVE CHANGES'}
           </button>
         </div>
       </div>
