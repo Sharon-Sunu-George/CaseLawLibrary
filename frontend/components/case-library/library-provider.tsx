@@ -186,6 +186,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         let finalRecord: CaseRecord = { ...record }
         const oldDocumentId = record.pdfMetadata?.documentId || record.id
         let newlyStagedDocId: string | null = null
+        const previousCases = casesRef.current
 
         // 1. STAGED PDF REPLACEMENT / UPLOAD:
         // Save the new document under a distinct staged key before touching anything else.
@@ -210,7 +211,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 
         if (!isHydratedRef.current) {
           pendingMutationsRef.current.push(mutation)
-          const optimistic = applyMutation(casesRef.current, mutation)
+          const optimistic = applyMutation(previousCases, mutation)
           casesRef.current = optimistic
           setCases(optimistic)
           notify(
@@ -221,7 +222,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        const nextCases = applyMutation(casesRef.current, mutation)
+        const nextCases = applyMutation(previousCases, mutation)
         casesRef.current = nextCases
         setCases(nextCases)
 
@@ -236,15 +237,15 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
               await deleteDocument(newlyStagedDocId)
             } catch (cleanupErr) {
               console.error('Error cleaning up staged document:', cleanupErr)
+              if (newlyStagedDocId) {
+                recordOrphanedDocument(newlyStagedDocId)
+              }
             }
           }
 
-          // Revert in-memory state
-          const reverted = casesRef.current.filter((c) => c.id !== record.id)
-          const original = cases.find((c) => c.id === record.id)
-          const safeRevert = original ? [...reverted, original] : reverted
-          casesRef.current = safeRevert
-          setCases(safeRevert)
+          // Revert only this failed operation; do not mutate any other records
+          casesRef.current = previousCases
+          setCases(previousCases)
 
           notify(
             'Storage quota exceeded: Changes could not be saved to local storage. Original document was untouched.',
@@ -279,7 +280,7 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         )
       })
     },
-    [cases, notify, runExclusive],
+    [notify, runExclusive],
   )
 
   /**
@@ -291,13 +292,14 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
   const deleteCase = useCallback(
     (id: string, title?: string): Promise<void> => {
       return runExclusive(async () => {
-        const targetCase = casesRef.current.find((c) => c.id === id)
+        const previousCases = casesRef.current
+        const targetCase = previousCases.find((c) => c.id === id)
         const documentIdToDelete = targetCase?.pdfMetadata?.documentId || id
         const mutation: PendingMutation = { type: 'delete', id, title }
 
         if (!isHydratedRef.current) {
           pendingMutationsRef.current.push(mutation)
-          const optimistic = applyMutation(casesRef.current, mutation)
+          const optimistic = applyMutation(previousCases, mutation)
           casesRef.current = optimistic
           setCases(optimistic)
           notify(`Removed "${title || 'case'}" from the index.`)
@@ -305,18 +307,15 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
         }
 
         // 1. PERSIST CASE DELETION TO LOCALSTORAGE FIRST:
-        const nextCases = applyMutation(casesRef.current, mutation)
+        const nextCases = applyMutation(previousCases, mutation)
         casesRef.current = nextCases
         setCases(nextCases)
 
         const persisted = saveStoredCases(nextCases)
         if (!persisted) {
-          // Revert in-memory state
-          if (targetCase) {
-            const restored = [targetCase, ...casesRef.current]
-            casesRef.current = restored
-            setCases(restored)
-          }
+          // Revert only this failed deletion
+          casesRef.current = previousCases
+          setCases(previousCases)
           notify(
             'Warning: Storage error. Case could not be deleted from storage. Document was preserved.',
             'info',
@@ -340,41 +339,46 @@ export function LibraryProvider({ children }: { children: React.ReactNode }) {
 
   const addCases = useCallback(
     (records: CaseRecord[]) => {
-      const mutation: PendingMutation = { type: 'add', records }
+      return runExclusive(async () => {
+        const previousCases = casesRef.current
+        const mutation: PendingMutation = { type: 'add', records }
 
-      if (!isHydratedRef.current) {
-        pendingMutationsRef.current.push(mutation)
-        const optimistic = applyMutation(casesRef.current, mutation)
-        casesRef.current = optimistic
-        setCases(optimistic)
+        if (!isHydratedRef.current) {
+          pendingMutationsRef.current.push(mutation)
+          const optimistic = applyMutation(previousCases, mutation)
+          casesRef.current = optimistic
+          setCases(optimistic)
+          notify(
+            `Bulk imported ${records.length} case record${
+              records.length > 1 ? 's' : ''
+            }.`,
+          )
+          return
+        }
+
+        const nextCases = applyMutation(previousCases, mutation)
+        casesRef.current = nextCases
+        setCases(nextCases)
+
+        const persisted = saveStoredCases(nextCases)
+        if (!persisted) {
+          casesRef.current = previousCases
+          setCases(previousCases)
+          notify(
+            'Warning: Bulk records could not be saved to local storage. No changes were applied.',
+            'info',
+          )
+          return
+        }
+
         notify(
           `Bulk imported ${records.length} case record${
             records.length > 1 ? 's' : ''
           }.`,
         )
-        return
-      }
-
-      const nextCases = applyMutation(casesRef.current, mutation)
-      casesRef.current = nextCases
-      setCases(nextCases)
-
-      const persisted = saveStoredCases(nextCases)
-      if (!persisted) {
-        notify(
-          'Warning: Bulk records imported in memory, but could not be saved to local storage.',
-          'info',
-        )
-        return
-      }
-
-      notify(
-        `Bulk imported ${records.length} case record${
-          records.length > 1 ? 's' : ''
-        }.`,
-      )
+      })
     },
-    [notify],
+    [notify, runExclusive],
   )
 
   const value = useMemo<LibraryContextValue>(

@@ -27,7 +27,7 @@ export function LibraryView() {
   const { cases, setLastQuery } = useLibrary()
   const [phase, setPhase] = useState<Phase>('idle')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState<5 | 10>(5)
+  const [pageSize, setPageSize] = useState<5 | 'all'>(5)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const filters = useMemo(() => parseFilters(params), [params])
@@ -73,12 +73,16 @@ export function LibraryView() {
     commitWithLatency({ ...filters, query: tag })
   }
 
-  // Pagination calculation
-  const totalPages = Math.max(1, Math.ceil(results.length / pageSize))
+  // Pagination calculation. "all" shows every matching case without page controls.
+  const effectivePageSize =
+    pageSize === 'all' ? Math.max(results.length, 1) : (pageSize as number)
+  const totalPages = Math.max(1, Math.ceil(results.length / effectivePageSize))
   const safePage = Math.min(currentPage, totalPages)
   const paginatedCases = useMemo(() => {
-    const start = (safePage - 1) * pageSize
-    return results.slice(start, start + pageSize)
+    if (pageSize === 'all') return results
+    const pageSizeNumber = pageSize as number
+    const start = (safePage - 1) * pageSizeNumber
+    return results.slice(start, start + pageSizeNumber)
   }, [results, safePage, pageSize])
 
   const appliedKey = filtersToQueryString({ ...filters, sort: DEFAULT_FILTERS.sort })
@@ -117,7 +121,7 @@ export function LibraryView() {
             <CaseList
               cases={paginatedCases}
               currentPage={safePage}
-              pageSize={pageSize}
+              pageSize={pageSize === 'all' ? Math.max(results.length, 1) : pageSize}
               onTagClick={handleTagClick}
             />
 
@@ -126,13 +130,13 @@ export function LibraryView() {
               <div className="border-b-[1.5px] border-black bg-white px-5 sm:px-7 py-3 flex flex-wrap items-center justify-between gap-4 text-xs">
                 <div className="flex items-center gap-2 text-neutral-600">
                   <span className="font-extrabold text-black uppercase tracking-[0.1em] text-[10.5px]">
-                    SHOWING {(safePage - 1) * pageSize + 1}–
-                    {Math.min(safePage * pageSize, results.length)} OF {results.length}
+                    SHOWING {(safePage - 1) * (pageSize === 'all' ? results.length : pageSize) + 1}–
+                    {Math.min(safePage * (pageSize === 'all' ? results.length : pageSize), results.length)} OF {results.length}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {pageSize === 5 && totalPages > 1 && (
+                  {pageSize !== 'all' && totalPages > 1 && (
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
@@ -170,7 +174,7 @@ export function LibraryView() {
                   <button
                     type="button"
                     onClick={() => {
-                      setPageSize((prev) => (prev === 5 ? 10 : 5))
+                      setPageSize((prev) => (prev === 5 ? 'all' : 5))
                       setCurrentPage(1)
                     }}
                     className="px-3 h-7 border border-black text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-black hover:bg-black hover:text-white transition-colors cursor-pointer"

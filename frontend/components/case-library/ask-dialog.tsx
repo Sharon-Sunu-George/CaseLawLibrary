@@ -1,8 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { filtersToQueryString, DEFAULT_FILTERS } from '@/lib/case-query'
+import { filtersToQueryString, DEFAULT_FILTERS, rankAskResults } from '@/lib/case-query'
 import { useLibrary } from './library-provider'
 import { Modal } from './ui'
 
@@ -34,12 +35,7 @@ export function AskDialog({ open, onClose }: { open: boolean; onClose: () => voi
   }
 
   const matchingCases = submittedQuestion
-    ? cases.filter((c) =>
-        [c.title, c.citation, c.caseNumber, c.court, c.code, c.summary, ...(c.tags || [])]
-          .join(' ')
-          .toLowerCase()
-          .includes(submittedQuestion.toLowerCase()),
-      ).slice(0, 3)
+    ? rankAskResults(submittedQuestion, cases, 5)
     : []
 
   return (
@@ -57,6 +53,9 @@ export function AskDialog({ open, onClose }: { open: boolean; onClose: () => voi
         <p className="text-xs text-neutral-600 leading-relaxed">
           Query across all {cases.length} indexed judgments by legal proposition, statutory provision, or factual issue.
         </p>
+        <div className="border-l-2 border-[#D91C1F] pl-3 text-[11px] font-bold text-neutral-700 uppercase tracking-[0.08em]">
+          Retrieved from indexed case records only. No AI-generated legal advice, holdings or citations are produced.
+        </div>
 
         <form
           onSubmit={(e) => {
@@ -117,18 +116,32 @@ export function AskDialog({ open, onClose }: { open: boolean; onClose: () => voi
               </p>
             ) : (
               matchingCases.map((match) => (
-                <div key={match.id} className="border border-neutral-300 p-3.5 bg-neutral-50">
+                <div key={match.record.id} className="border border-neutral-300 p-3.5 bg-neutral-50">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-extrabold text-black">
-                      {match.title}
-                    </span>
+                    <Link
+                      href={`/cases/${match.record.id}`}
+                      className="text-xs font-extrabold text-black hover:text-[#D91C1F] underline underline-offset-2 transition-colors"
+                    >
+                      {match.record.title}
+                    </Link>
                     <span className="text-[11px] text-[#D91C1F] font-bold">
-                      {match.citation || match.caseNumber}
+                      {match.record.citation || match.record.caseNumber}
                     </span>
                   </div>
                   <p className="text-xs text-neutral-700 mt-1 leading-relaxed">
-                    {match.summary}
+                    {match.snippet}
                   </p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-[10.5px] text-neutral-500 uppercase tracking-[0.08em]">
+                      Relevance: {match.score}
+                    </span>
+                    <Link
+                      href={`/cases/${match.record.id}`}
+                      className="text-[10.5px] font-extrabold tracking-[0.1em] uppercase text-black hover:text-[#D91C1F] underline"
+                    >
+                      Open dossier ↗
+                    </Link>
+                  </div>
                 </div>
               ))
             )}

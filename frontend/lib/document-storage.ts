@@ -115,8 +115,27 @@ export async function saveDocument(
     const store = tx.objectStore(STORE_NAME)
     const request = store.put(record)
 
-    request.onsuccess = () => resolve(metadata)
-    request.onerror = () => reject(request.error || new Error('Failed to save document in IndexedDB.'))
+    let settled = false
+    request.onerror = () => {
+      if (settled) return
+      settled = true
+      reject(request.error || new Error('Failed to save document in IndexedDB.'))
+    }
+    tx.onerror = () => {
+      if (settled) return
+      settled = true
+      reject(tx.error || new Error('Failed to commit document transaction.'))
+    }
+    tx.onabort = () => {
+      if (settled) return
+      settled = true
+      reject(new Error('Document storage transaction was aborted.'))
+    }
+    tx.oncomplete = () => {
+      if (settled) return
+      settled = true
+      resolve(metadata)
+    }
   })
 }
 
@@ -168,8 +187,27 @@ export async function deleteDocument(primaryKey: string): Promise<boolean> {
       const store = tx.objectStore(STORE_NAME)
       const request = store.delete(primaryKey)
 
-      request.onsuccess = () => resolve(true)
-      request.onerror = () => reject(request.error || new Error('Failed to delete document from IndexedDB.'))
+      let settled = false
+      request.onerror = () => {
+        if (settled) return
+        settled = true
+        reject(request.error || new Error('Failed to delete document from IndexedDB.'))
+      }
+      tx.onerror = () => {
+        if (settled) return
+        settled = true
+        reject(tx.error || new Error('Failed to commit document deletion.'))
+      }
+      tx.onabort = () => {
+        if (settled) return
+        settled = true
+        reject(new Error('Document deletion transaction was aborted.'))
+      }
+      tx.oncomplete = () => {
+        if (settled) return
+        settled = true
+        resolve(true)
+      }
     })
   } catch (err) {
     console.error('Error deleting document from IndexedDB:', err)
